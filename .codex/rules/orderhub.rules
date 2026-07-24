@@ -1,0 +1,35 @@
+# Destructive operations are never allowed in this training repository.
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Prevent recursive deletion.",
+)
+prefix_rule(
+    pattern = ["Remove-Item", "-Recurse"],
+    decision = "forbidden",
+    justification = "Prevent recursive deletion.",
+)
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Prevent losing uncommitted work.",
+)
+prefix_rule(
+    pattern = ["git", "push", "--force"],
+    decision = "forbidden",
+    justification = "Prevent force-pushing shared history.",
+)
+
+# Operations with external or destructive impact require user confirmation.
+prefix_rule(pattern = ["dotnet", "ef", "database", "drop"], decision = "prompt", justification = "Dropping a database is destructive.")
+prefix_rule(pattern = ["git", "push"], decision = "prompt", justification = "Confirm before changing a remote repository.")
+
+# Local, routine verification and commit operations are safe defaults.
+prefix_rule(pattern = ["dotnet", "build"], decision = "allow", justification = "Routine build.")
+prefix_rule(pattern = ["dotnet", "test"], decision = "allow", justification = "Routine test run.")
+prefix_rule(pattern = ["dotnet", "run"], decision = "allow", justification = "Local development server.")
+prefix_rule(pattern = ["git", "status"], decision = "allow", justification = "Read-only status check.")
+prefix_rule(pattern = ["git", "diff"], decision = "allow", justification = "Read-only diff.")
+prefix_rule(pattern = ["git", "log"], decision = "allow", justification = "Read-only history check.")
+prefix_rule(pattern = ["git", "add"], decision = "allow", justification = "Routine staging after explicit approval.")
+prefix_rule(pattern = ["git", "commit"], decision = "allow", justification = "Routine local commit after explicit approval.")
