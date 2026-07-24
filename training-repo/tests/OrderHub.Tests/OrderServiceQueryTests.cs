@@ -38,6 +38,27 @@ public class OrderServiceQueryTests
 
         Assert.Equal(45, result.TotalCount);
         Assert.Equal(3, result.TotalPages);
+        // Page 1 must contain the newest 20 orders; the previous offset skipped them all.
+        Assert.Equal(20, result.Items.Count);
+        Assert.Equal(Enumerable.Range(1, 20), result.Items.Select(o => o.Id));
+    }
+
+    [Fact]
+    public async Task GetOrders_LastPage_ReturnsRemainingOrders()
+    {
+        using var db = TestSetup.CreateContext();
+        var service = TestSetup.CreateOrderService(db);
+        var customer = TestSetup.AddCustomer(db);
+
+        for (var i = 0; i < 45; i++)
+            db.Orders.Add(new Order { CustomerId = customer.Id, Status = OrderStatus.Confirmed, CreatedAt = DateTime.UtcNow.AddMinutes(-i) });
+        db.SaveChanges();
+
+        var result = await service.GetOrdersAsync(3, 20, null);
+
+        // 45 orders at 20 per page leaves 5 orders on page 3; the old offset skipped 60 and returned none.
+        Assert.Equal(5, result.Items.Count);
+        Assert.Equal(Enumerable.Range(41, 5), result.Items.Select(o => o.Id));
     }
 
     [Fact]
