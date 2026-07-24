@@ -23,3 +23,5 @@ node_modules/
 
 # Runtime session memory (not project guidance)
 /AGENTS.md
+training-repo/.codex/hooks/edit-log.txt
+/HANDOFF.md
