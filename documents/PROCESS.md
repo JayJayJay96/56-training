@@ -50,58 +50,37 @@
 
 練習 1
 
-1. 我能不看筆記說出三個專案（Web/Core/Infrastructure）各自的職責
-   - 已經大概可以分到 Web、Core、Infrastructure 各自做什么。
-2. 我核對過 agent 描述的建單流程，且**至少找出一處不精確或過度簡化的說法**
-   - 也有找到一个 Gold discount 被算两次的问题, agent 也有給 summary 但是不是很清楚。
-3. 我知道商業邏輯應該放在哪一層、新增頁面要動哪些地方
-   - 之后加功能会先跟著现有 pattern，不会直接在 Controller 里面塞 business logic。
+一開始我只能大概分出 Web、Core、Infrastructure 在做什麼，現在至少知道要找哪一層：頁面和接參數看 Web，商業規則看 Core，資料庫查詢看 Infrastructure。
+
+這次也讓我發現 agent 講的流程不能直接當答案。Gold 折扣那個問題就是我自己順著程式看，才發現價格被折了兩次。之後如果要加功能，我會先找現有的 pattern，不會一看到需求就直接把 business logic 塞進 Controller。
 
 練習 2
 
-1. 三個客訴都先在頁面上重現過，才開始找程式
-   - 客訴 1：在 `/Orders` 新增兩筆訂單後，第一頁找不到；共 202 筆、每頁 20 筆時，第 11 / 11 頁是空白。
-   - 客訴 2 也已重現：商品 SKU-1001 原價 NT$1,420，Gold 訂單 #204 與 Silver 訂單 #205 使用同一商品各 1 件。
-   - 客訴 3：取消訂單 #206（SKU-1002 × 1）後，商品頁庫存沒有加回；當時頁面顯示庫存 101。
-2. 我給 agent 的資訊包含具體觀察（頁碼／金額數字／庫存數字），而不是只貼客訴原文
-   - 我提供的觀察是：「我新加了 2 個訂單，的確都找不到；最後一頁必定空白。」之後確認頁面顯示共 202 筆、第 1 / 11 頁，最後一頁 0 筆。
-   - 客訴 2 的實際數字是：#204 Gold 單價快照 NT$1,278、小計 NT$1,278、應付 NT$1,150.20；#205 Silver 單價快照 NT$1,420、應付 NT$1,349。
-   - 客訴 3 的實際觀察是：#206 狀態為「已取消」、商品為 SKU-1002、數量 1，產品頁目前庫存為 101。
-3. 每個修復都回到頁面驗證過症狀消失
-   - 修正後，第 1 頁最前面的訂單編號是 202、201；第 11 / 11 頁有 2 筆訂單，不再空白。
-   - 客訴 2 的回歸測試已確認原價快照與只折扣一次；頁面最終仍需重新建立 Gold 訂單確認單價快照 NT$1,420、折扣 NT$142、應付 NT$1,278。既有 #204 不會自動改寫。
-   - 客訴 3 修正後需重新建立一筆商品訂單，確認庫存依序為「建立前 N、建立後 N-1、取消後 N」。既有 #206 不會自動補回庫存。
-4. 每個 bug 都補了一個回歸測試，`dotnet test` 全綠
-   - 客訴 1 補了第 1 頁應回傳最新 20 筆、最後一頁應回傳剩餘 5 筆的測試；`dotnet test OrderHub.sln --no-restore -m:1` 結果為 29 passed、0 failed。
-   - 客訴 2 補 `CreateOrder_GoldSnapshotsListPriceAndAppliesDiscountOnce`：驗證快照為 1000、總額為 900；完整測試結果為 30 passed、0 failed。
-   - 客訴 3 補 `CancelOrder_RestoresProductStock`：驗證庫存由 10 減為 9，再恢復為 10；完整測試結果為 31 passed、0 failed。
-5. 三個獨立 commit，message 說明症狀與根因
-   - 客訴 1、2、3 已各自建立獨立 commit（`7f5f77e`、`64c475a`、`6ab9e7d`）。
-6. （思考題）為什麼原本的測試沒抓到這三個 bug？
-   - 客訴 1 的原有測試只驗證 `TotalCount` 和 `TotalPages`，沒有驗證第 1 頁與最後一頁實際回傳的訂單；因此錯誤的 `Skip(page * pageSize)` 仍可通過測試。
-   - 客訴 2 原有測試分開驗證折扣率、快照原價與 `CalculateTotal`，沒有把 Gold 建單、快照與總額串在同一個流程驗證，所以重複折扣未被抓到。
-   - 客訴 3 原有測試只驗證訂單狀態變成 `Cancelled`，沒有驗證商品庫存，因此狀態測試會通過但庫存錯誤未被發現。
+三個客訴我都有先在頁面重現，再把實際看到的數字告訴 agent。像第一個是 202 筆訂單、第 11 頁 0 筆；第二個是 Gold 訂單原本應該是 1278，頁面卻顯示 1150.20；第三個是取消後庫存沒有從 N-1 回到 N。這些數字比只貼客訴內容有用很多。
+
+修完後我有補回歸測試，也各自建立了 commit：`7f5f77e`、`64c475a`、`6ab9e7d`。這三個 bug 原本沒被測出來，主要是舊測試只驗證其中一小段：分頁沒驗證實際回傳的資料、折扣沒把建單到總額串起來、取消訂單沒驗證庫存。所以測試都會綠，但畫面上的結果還是錯的。
 
 練習 3
 
-我先開 `/Products/LowStock` 看不帶參數的結果，頁面使用門檻 10，顯示 5 筆商品，庫存是 2、2、3、4、4，順序由低到高。之後改了幾個 threshold：`2` 時 0 筆、`3` 時 2 筆、`5` 時 5 筆、`20` 時 7 筆。這也確認了條件是庫存小於門檻，剛好等於門檻的商品不會出現。
+這個功能做完後，我先看不帶參數的頁面，門檻 10 時有 5 筆，庫存是 2、2、3、4、4。改 threshold 後數量也有跟著變，`threshold=2` 是 0 筆、`3` 是 2 筆、`5` 是 5 筆、`20` 是 7 筆，所以 `<` 和 `<=` 的差別有實際確認到。
 
-輸入 `threshold=0` 和 `threshold=-1` 時，頁面仍然回傳 200，輸入框下面顯示「門檻必須大於 0」，沒有進到 500 錯誤頁。
+`threshold=0` 和 `threshold=-1` 沒有跑到 500，而是在欄位下面顯示「門檻必須大於 0」。測試也確認取消的訂單和 31 天前的訂單不會算進銷量，停售商品不會出現在結果裡。
 
-售出數量的測試放了三筆資料：30 天內的 Confirmed 訂單數量 5、30 天內的 Cancelled 訂單數量 3，以及 31 天前的 Confirmed 訂單數量 2。最後只計算 5，表示取消訂單和超過 30 天的訂單都有排除。另放了一筆低庫存但 `IsActive = false` 的商品，查詢結果也沒有列出它。
+這次我有照原本的方式分層，Controller 沒有直接寫查詢。只是實際的過濾和銷量統計現在主要在 Repository，ProductService 比較像轉接，這點和 guideline 講的「邏輯放 Core service」不是完全一樣。功能本身和測試都有完成，這個分層差異先記下來。
 
-這次的分層沿用原本 Products 功能：Controller 負責接收 threshold、檢查 ModelState 和組 ViewModel；查詢與售出數量統計放在 repository；View 使用自己的 ViewModel。我看過 diff，沒有把查詢或庫存判斷塞進 Controller。
-
-補上的三個測試是 `GetLowStock_FiltersByThresholdAndOrdersByStockAscending`、`GetLowStock_ExcludesInactiveProducts` 和 `GetLowStock_SoldLast30Days_ExcludesCancelledAndOutOfWindowOrders`。目前本機執行 `dotnet test` 會被 `obj` 目錄的寫入權限擋住，所以不能把完整測試結果寫成已確認；之前在可寫入的乾淨副本執行過的結果，和目前 repository 的狀態要分開記錄。
+練習 3 的三個測試都有補上。原本 repository 的 `obj` 目錄不能寫，所以在原目錄執行測試會失敗；我後來用乾淨的可寫副本重跑，結果是 34 passed、0 failed、0 skipped。
 
 練習 4
 
-這次只整理 `OrderService.CreateOrderAsync` 裡的驗證流程，沒有改訂單建立的規則。原本客戶、明細、數量、重複商品和商品庫存的檢查全部堆在同一個方法裡；重構後把客戶、明細、數量和重複商品的檢查抽到 `ValidateOrderRequestAsync`，商品逐筆檢查、扣庫存和建立訂單明細抽到 `ValidateAndAddOrderLinesAsync`。
+這次只是把 `CreateOrderAsync` 拆小，沒有改建單規則。客戶、空明細、數量和重複商品的檢查放到 `ValidateOrderRequestAsync`，商品和庫存的檢查放到 `ValidateAndAddOrderLinesAsync`。原本的錯誤訊息、扣庫存和折扣計算都保留。
 
-我重新看過 diff，確認折扣、庫存扣除、錯誤訊息和 `ServiceResult` 的行為沒有一起被改掉。現有的建單、庫存、重複商品、停售商品和庫存不足測試仍是這次重構的安全網；不過本機測試目前仍受到 `obj` 目錄 ACL 影響，還不能在這個 repository 裡重新跑出完整通過數字。
+這次是我直接確認方向後讓 agent 做，沒有完全照 guideline 的「先出計畫、等確認」那一段走。做完我自己看了 diff，也在乾淨副本跑過全部測試，34 個都通過。這次重構主要改善的是方法太長，沒有改外部行為。
 
 ---
 
 ## 附錄：值得留下的對話片段
 
-（貼 1–2 段最有代表性的 prompt 與回應**摘要**——不用貼全文，重點是「我怎麼問」和「它怎麼答」。）
+目前最值得留下的是兩段：
+
+1. 一開始我只說「帮我看下这个项目，你先理解一下，將你瞭解到的分成一個一個階段」，agent 很快先幫我抓出 Web、Core、Infrastructure 和主要流程，適合用來快速熟悉陌生專案。
+2. 後來我沒有只說「Gold 金額不對」，而是補了 SKU、會員等級、單價和畫面上的實際金額。這讓排查從猜測變成可以沿著程式和測試去對數字。
